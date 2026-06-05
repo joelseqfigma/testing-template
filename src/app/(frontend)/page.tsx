@@ -1,59 +1,44 @@
-import { headers as getHeaders } from 'next/headers.js'
-import Image from 'next/image'
 import { getPayload } from 'payload'
+import configPromise from '@payload-config'
 import React from 'react'
-import { fileURLToPath } from 'url'
 
-import config from '@/payload.config'
-import './styles.css'
+import { HeroSection } from './components/HeroSection'
+import { ProductGrid } from './components/ProductGrid'
+import { CategoryFilter } from './components/CategoryFilter'
+import { AboutSection } from './components/AboutSection'
+import { Newsletter } from './components/Newsletter'
+import { FrontendSeedButton } from './components/SeedButton'
 
-export default async function HomePage() {
-  const headers = await getHeaders()
-  const payloadConfig = await config
-  const payload = await getPayload({ config: payloadConfig })
-  const { user } = await payload.auth({ headers })
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string }>
+}) {
+  const payload = await getPayload({ config: configPromise })
+  const { category } = await searchParams
 
-  const fileURL = `vscode://file/${fileURLToPath(import.meta.url)}`
+  const { docs: products } = await payload.find({
+    collection: 'products',
+    where: category ? { category: { equals: category } } : {},
+    limit: 100,
+    depth: 1,
+  })
+
+  const settings = await payload.findGlobal({ slug: 'store-settings', depth: 1 })
+
+  if (products.length === 0 && !category) {
+    return <FrontendSeedButton />
+  }
 
   return (
-    <div className="home">
-      <div className="content">
-        <picture>
-          <source srcSet="https://raw.githubusercontent.com/payloadcms/payload/3.x/packages/ui/src/assets/payload-favicon.svg" />
-          <Image
-            alt="Payload Logo"
-            height={65}
-            src="https://raw.githubusercontent.com/payloadcms/payload/3.x/packages/ui/src/assets/payload-favicon.svg"
-            width={65}
-          />
-        </picture>
-        {!user && <h1>Welcome to your new project.</h1>}
-        {user && <h1>Welcome back, {user.email}</h1>}
-        <div className="links">
-          <a
-            className="admin"
-            href={payloadConfig.routes.admin}
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            Go to admin panel
-          </a>
-          <a
-            className="docs"
-            href="https://payloadcms.com/docs"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            Documentation
-          </a>
-        </div>
+    <>
+      <HeroSection settings={settings} />
+      <div className="product-grid-section">
+        <CategoryFilter active={category} />
+        <ProductGrid products={products} />
       </div>
-      <div className="footer">
-        <p>Update this page by editing</p>
-        <a className="codeLink" href={fileURL}>
-          <code>app/(frontend)/page.tsx</code>
-        </a>
-      </div>
-    </div>
+      <AboutSection />
+      <Newsletter heading={settings.newsletterHeading} />
+    </>
   )
 }
